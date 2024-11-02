@@ -1,68 +1,128 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 import duckdb
-import threading
 import logging
 from datetime import datetime
+from typing import Optional
 
-# Configuration
-DB_PATH = "/home/rob/Documents/simple-gateway/awesome-project/devices.duckdb"  # Update this path
-POSTGRES_PORT = 5433
-
-# Initialize FastAPI
+# Initialize FastAPI app
 app = FastAPI()
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
-# FastAPI endpoints
-@app.get("/measurements")
-async def get_measurements():
+# Path to the DuckDB database file
+DB_PATH = "device.duckdb"  # Ensure this is the correct path to your DuckDB file
+
+# Set up basic logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Define a sample API key for verification
+API_KEY = "q1LKu7RQyxunnDW"  # Replace with your actual API key if needed
+
+# Endpoint for querying with any field as a filter
+@app.get("/query")
+async def run_query(
+    datetime: Optional[str] = None,
+    longitude: Optional[float] = None,
+    latitude: Optional[float] = None,
+    device_id: Optional[int] = None,
+    value: Optional[float] = None,
+    unit: Optional[str] = None,
+    height: Optional[float] = None,
+    sql: Optional[str] = None
+):
     try:
+        logging.debug("Connecting to DuckDB")
         conn = duckdb.connect(database=DB_PATH, read_only=True)
-        query = "SELECT datetime, longitude, latitude, device_id, value, unit, height FROM measurements"
-        results = conn.execute(query).fetchall()
-        data = [
-            {
-                "datetime": row[0],
-                "longitude": row[1],
-                "latitude": row[2],
-                "device_id": row[3],
-                "value": row[4],
-                "unit": row[5],
-                "height": row[6]
-            }
-            for row in results
-        ]
-        return data
+        
+        # Construct the SQL query based on provided parameters
+        if sql:
+            # Custom SQL query
+            query = sql
+            logging.debug(f"Executing custom SQL query: {query}")
+        else:
+            # Build a dynamic SQL query based on provided fields
+            query = "SELECT * FROM measurements"
+            filters = []
+
+            if datetime:
+                filters.append(f"datetime = '{datetime}'")
+            if longitude is not None:
+                filters.append(f"longitude = {longitude}")
+            if latitude is not None:
+                filters.append(f"latitude = {latitude}")
+            if device_id is not None:
+                filters.append(f"device_id = {device_id}")
+            if value is not None:
+                filters.append(f"value = {value}")
+            if unit:
+                filters.append(f"unit = '{unit}'")
+            if height is not None:
+                filters.append(f"height = {height}")
+
+            # Add WHERE clause if there are any filters
+            if filters:
+                query += " WHERE " + " AND ".join(filters)
+            
+            logging.debug(f"Executing generated query: {query}")
+
+        # Execute the constructed query
+        result = conn.execute(query).fetchall()
+        column_names = [desc[0] for desc in conn.description]
+        conn.close()
+        
+        # Format the result as JSON
+        data = [dict(zip(column_names, row)) for row in result]
+        
+        logging.debug("Query executed successfully")
+        return {"data": data}
+    
     except Exception as e:
-        logger.error(f"Error fetching data: {e}")
+        logging.error(f"Error executing query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Endpoint for inserting data into the "measurements" table
 @app.post("/measurements")
-async def add_measurement(request: Request):
+async def add_measurement(request: Request, api_key: str = Query(...)):
+    # Verify the API key
+    if api_key != API_KEY:
+        logging.warning("Unauthorized attempt with invalid API key")
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    
     try:
-        data = await request.json()  # Parse incoming JSON data
+        # Get JSON data from the request
+        data = await request.json()
+        
+        # Add a timestamp if not provided
         data['datetime'] = data.get('datetime', datetime.now().isoformat())
 
-        with duckdb.connect(database=DB_PATH, read_only=False) as conn:
-            conn.execute('''
-                INSERT INTO measurements (datetime, longitude, latitude, device_id, value, unit, height)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', [
+        # Connect to DuckDB and insert the data
+        logging.debug("Connecting to DuckDB for insertion")
+        conn = duckdb.connect(database=DB_PATH)
+        
+        # Insert the received data into the measurements table
+        conn.execute(
+            """
+            INSERT INTO measurements (datetime, longitude, latitude, device_id, value, unit, height)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
                 data['datetime'],
                 float(data['longitude']),
                 float(data['latitude']),
-                data['device_id'],
+                int(data['device_id']),
                 float(data['value']),
                 data['unit'],
-                float(data['height'])
-            ])
-
-        return {"status": "success", "message": "Data added successfully"}
-
+                float(data['height']),
+            ]
+        )
+        conn.close()
+        
+        logging.debug("Data inserted successfully")
+        return {"status": "success"}
+    
     except Exception as e:
-        logger.error(f"Error adding data: {e}")
+        logging.error(f"Error adding measurement: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# Example endpoint for checking if the API is running
+@app.get("/status")
+async def status():
+    return {"status": "API is running"}
