@@ -1,36 +1,32 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 import duckdb
-from datetime import datetime
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
+DB_PATH = "/home/rob/Documents/simple-gateway/awesome-project/devices.duckdb"  # Ensure this is the correct path
 
-@app.get("/search")
-async def search():
-    # Return the available fields as a list
-    return ["value", "longitude", "latitude", "height"]
-
-@app.post("/query")
-async def query(request: dict):
-    target = request["targets"][0]["target"]
-    
-    # Open a new DuckDB connection within this request
+@app.get("/measurements")
+async def get_measurements():
     try:
-        with duckdb.connect('devices.duckdb') as db_connection:
-            data = db_connection.execute(f'''
-                SELECT datetime, {target} FROM measurements ORDER BY datetime
-            ''').fetchall()
-
-            # Format the data in a way Grafana can read
-            return [{
-                "target": target,
-                "datapoints": [
-                    [row[1], int(datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").timestamp() * 1000)]
-                    for row in data
-                ]
-            }]
+        conn = duckdb.connect(database=DB_PATH, read_only=True)
+        query = "SELECT datetime, longitude, latitude, device_id, value, unit, height FROM measurements"
+        results = conn.execute(query).fetchall()
+        data = [
+            {
+                "datetime": row[0],
+                "longitude": row[1],
+                "latitude": row[2],
+                "device_id": row[3],
+                "value": row[4],
+                "unit": row[5],
+                "height": row[6]
+            }
+            for row in results
+        ]
+        return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/annotations")
-async def annotations(request: dict):
-    return []
+        logger.error(f"Error fetching data: {e}")
+        return {"status": "error", "message": str(e)}
