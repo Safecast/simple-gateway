@@ -8,9 +8,7 @@ Setup incoming data app:
 
 In Grafana;
  http://localhost:8000/query?device_id=47&latitude=35.6617&unit=cpm 
-
-Sedning pOST curl:
-
+ or http://localhost:8000/query?device_id=49&latitude=35.6617&unit=cpm&device_id=47
 
 
 Test a curl:

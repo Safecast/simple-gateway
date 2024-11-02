@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 import duckdb
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -16,15 +16,16 @@ logging.basicConfig(level=logging.DEBUG)
 # Define a sample API key for verification
 API_KEY = "q1LKu7RQyxunnDW"  # Replace with your actual API key if needed
 
-# Endpoint for querying with any field as a filter
+# Endpoint for querying with any field as a filter, including multiple device IDs
 @app.get("/query")
 async def run_query(
     datetime: Optional[str] = None,
     longitude: Optional[float] = None,
     latitude: Optional[float] = None,
-    device_id: Optional[int] = None,
+    device_id: Optional[List[int]] = Query(None),
     value: Optional[float] = None,
     unit: Optional[str] = None,
+    not_unit: Optional[str] = None,
     height: Optional[float] = None,
     sql: Optional[str] = None
 ):
@@ -48,12 +49,16 @@ async def run_query(
                 filters.append(f"longitude = {longitude}")
             if latitude is not None:
                 filters.append(f"latitude = {latitude}")
-            if device_id is not None:
-                filters.append(f"device_id = {device_id}")
+            if device_id:
+                # Handle multiple device IDs
+                device_ids_str = ", ".join(map(str, device_id))
+                filters.append(f"device_id IN ({device_ids_str})")
             if value is not None:
                 filters.append(f"value = {value}")
             if unit:
                 filters.append(f"unit = '{unit}'")
+            if not_unit:
+                filters.append(f"unit != '{not_unit}'")
             if height is not None:
                 filters.append(f"height = {height}")
 
