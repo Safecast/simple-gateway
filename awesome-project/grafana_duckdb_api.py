@@ -13,14 +13,6 @@ app = FastAPI()
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Start DuckDB in server mode in a separate thread
-def start_duckdb_server():
-    duckdb.connect(database=DB_PATH).execute(f"INSTALL postgres_scanner; LOAD postgres_scanner;")
-    duckdb.connect(database=DB_PATH).execute(f"EXPORT DATABASE 'postgres://localhost:{POSTGRES_PORT}'")
-
-duckdb_thread = threading.Thread(target=start_duckdb_server, daemon=True)
-duckdb_thread.start()
-
 # FastAPI endpoints
 @app.get("/measurements")
 async def get_measurements():
