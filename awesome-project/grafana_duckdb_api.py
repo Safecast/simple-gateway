@@ -25,7 +25,7 @@ def parse_value(value, data_type):
     except (ValueError, TypeError):
         return None
 
-# Endpoint for querying with any field as a filter, supporting multiple device values
+# Endpoint for querying with any field as a filter, supporting multiple device values and wildcards
 @app.get("/query")
 async def run_query(
     bat_voltage: Optional[float] = None,
@@ -48,25 +48,49 @@ async def run_query(
         logging.debug("Connecting to DuckDB")
         conn = duckdb.connect(database=DB_PATH, read_only=True)
         
-        # Start building the SQL query
         query = "SELECT * FROM measurements"
         filters = []
 
-        # Add filters based on non-null query parameters
+        # Numeric filters
         if bat_voltage is not None:
             filters.append(f"bat_voltage = {bat_voltage}")
         if dev_temp is not None:
             filters.append(f"dev_temp = {dev_temp}")
         
-        # Handle multiple values for device
         if device:
-            device_list = ", ".join(map(str, device))  # Convert list to comma-separated values
+            device_list = ", ".join(map(str, device))
             filters.append(f"device IN ({device_list})")
         
+        # String filters with wildcard support
         if device_sn:
-            filters.append(f"device_sn = '{device_sn}'")
+            if "*" in device_sn:
+                device_sn = device_sn.replace("*", "%")
+                filters.append(f"device_sn LIKE '{device_sn}'")
+            else:
+                filters.append(f"device_sn = '{device_sn}'")
+
         if device_urn:
-            filters.append(f"device_urn = '{device_urn}'")
+            if "*" in device_urn:
+                device_urn = device_urn.replace("*", "%")
+                filters.append(f"device_urn LIKE '{device_urn}'")
+            else:
+                filters.append(f"device_urn = '{device_urn}'")
+
+        if loc_country:
+            if "*" in loc_country:
+                loc_country = loc_country.replace("*", "%")
+                filters.append(f"loc_country LIKE '{loc_country}'")
+            else:
+                filters.append(f"loc_country = '{loc_country}'")
+        
+        if loc_name:
+            if "*" in loc_name:
+                loc_name = loc_name.replace("*", "%")
+                filters.append(f"loc_name LIKE '{loc_name}'")
+            else:
+                filters.append(f"loc_name = '{loc_name}'")
+
+        # Add remaining filters
         if env_temp is not None:
             filters.append(f"env_temp = {env_temp}")
         if lnd_7128ec is not None:
@@ -75,48 +99,25 @@ async def run_query(
             filters.append(f"lnd_7318c = {lnd_7318c}")
         if lnd_7318u is not None:
             filters.append(f"lnd_7318u = {lnd_7318u}")
-        if loc_country:
-            filters.append(f"loc_country = '{loc_country}'")
         if loc_lat is not None:
             filters.append(f"loc_lat = {loc_lat}")
         if loc_lon is not None:
             filters.append(f"loc_lon = {loc_lon}")
-        if loc_name:
-            filters.append(f"loc_name = '{loc_name}'")
         if pms_pm02_5 is not None:
             filters.append(f"pms_pm02_5 = {pms_pm02_5}")
         if when_captured:
             filters.append(f"when_captured = '{when_captured}'")
 
-        # Add WHERE clause if there are any filters
         if filters:
             query += " WHERE " + " AND ".join(filters)
         
         logging.debug(f"Executing generated query: {query}")
 
-        # Execute the constructed query
         result = conn.execute(query).fetchall()
         column_names = [desc[0] for desc in conn.description]
         conn.close()
-        
-        # Format the result as JSON, ensuring all specified numeric fields are returned as integers
-        def convert_to_int(val):
-            try:
-                return int(float(val)) if val is not None else None
-            except (ValueError, TypeError):
-                return None
 
-        data = [
-            {
-                col: convert_to_int(val) if col in [
-                    "bat_voltage", "dev_temp", "device", "env_temp",
-                    "lnd_7128ec", "lnd_7318c", "lnd_7318u",
-                    "loc_lat", "loc_lon", "pms_pm02_5"
-                ] else val
-                for col, val in zip(column_names, row)
-            }
-            for row in result
-        ]
+        data = [{col: val for col, val in zip(column_names, row)} for row in result]
         
         logging.debug("Query executed successfully")
         return {"data": data}
