@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../../realtime-grafana-last-24-hours"
 		}
 	],
 	"settings": {}

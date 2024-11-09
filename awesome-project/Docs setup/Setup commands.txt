@@ -14,3 +14,12 @@ In Grafana;
 Test a curl:
    curl -X POST http://localhost:8000/measurements?api_key=q1LKu7RQyxunnDW -H "Content-Type: application/json" -d '{"longitude":"139.7449","latitude":"35.6617","device_id":"49","value":"60","unit":"cpm","height":"111"}'
 
+
+If Table is locked run below SQL statement in DucjDB with ./duckdb devices.duckdb
+  CREATE TABLE measurements_temp AS SELECT * FROM measurements;
+  DROP TABLE measurements;
+
+  CREATE TABLE measurements AS
+  SELECT * FROM measurements_temp;
+
+  DROP TABLE measurements_temp;
