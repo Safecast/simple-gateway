@@ -38,3 +38,12 @@ curl -X POST "http://localhost:8000/measurements?api_key=q1LKu7RQyxunnDW" \
 
     
     curl -X GET "http://localhost:8000/query?device_sn=SN12345" 
+
+
+If duckdb DB is changed there can ge a lock on the uniqueness of the table to remove use:
+
+  CREATE TABLE measurements_temp AS SELECT * FROM measurements;
+  DROP TABLE measurements;
+  CREATE TABLE measurements AS
+  SELECT * FROM measurements_temp;
+  DROP TABLE measurements_temp;
