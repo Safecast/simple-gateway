@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 import duckdb
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 app = FastAPI()
 DB_PATH = "devices.duckdb"
@@ -55,13 +55,14 @@ async def get_distinct_values(column: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Enhanced /query endpoint
+
 @app.get("/query")
 async def run_query(
     device: Optional[int] = None,
     bat_voltage: Optional[float] = None,
     dev_temp: Optional[int] = None,
     device_sn: Optional[str] = None,
-    device_urn: Optional[str] = None,
+    device_urn: Optional[list] = Query(None),  # Accepts a list of values
     env_temp: Optional[int] = None,
     lnd_7128ec: Optional[float] = None,
     lnd_7318c: Optional[float] = None,
@@ -72,8 +73,8 @@ async def run_query(
     loc_name: Optional[str] = None,
     pms_pm02_5: Optional[float] = None,
     when_captured: Optional[str] = None,
-    start_time: Optional[str] = None,  # New start time filter
-    end_time: Optional[str] = None,    # New end time filter
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
 ):
     """
     Run a dynamic query on the measurements table with optional filters and time range.
@@ -82,20 +83,10 @@ async def run_query(
         logging.debug("Connecting to DuckDB")
         conn = duckdb.connect(database=DB_PATH, read_only=True)
 
-        # Check if a device-specific view exists
-        table_name = f"device_{device}" if device else "measurements"
-        view_exists = conn.execute(
-            f"SELECT * FROM information_schema.tables WHERE table_name = '{table_name}'"
-        ).fetchone()
-
-        # If the view does not exist, fall back to the main measurements table
-        if not view_exists:
-            table_name = "measurements"
-
-        query = f"SELECT * FROM {table_name}"
+        query = "SELECT * FROM measurements"
         filters = []
 
-        # Apply filters as needed
+        # Apply dynamic filters for each column (from the query parameters)
         if bat_voltage is not None:
             filters.append(f"bat_voltage = {bat_voltage}")
         if dev_temp is not None:
@@ -105,7 +96,8 @@ async def run_query(
         if device_sn:
             filters.append(f"device_sn = '{device_sn}'")
         if device_urn:
-            filters.append(f"device_urn = '{device_urn}'")
+            urn_list = ", ".join([f"'{urn}'" for urn in device_urn])  # Ensure device_urn values are quoted and formatted correctly
+            filters.append(f"device_urn IN ({urn_list})")  # Use the correct SQL syntax for IN
         if env_temp is not None:
             filters.append(f"env_temp = {env_temp}")
         if lnd_7128ec is not None:
@@ -131,6 +123,7 @@ async def run_query(
         if end_time:
             filters.append(f"when_captured <= '{end_time}'")
 
+        # Apply filters if there are any
         if filters:
             query += " WHERE " + " AND ".join(filters)
 
@@ -140,6 +133,7 @@ async def run_query(
         column_names = [desc[0] for desc in conn.description]
         conn.close()
 
+        # Format the result as a list of JSON objects
         data = [{col: val for col, val in zip(column_names, row)} for row in result]
 
         logging.debug("Query executed successfully")
@@ -148,6 +142,9 @@ async def run_query(
     except Exception as e:
         logging.error(f"Error executing query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
 
 # Endpoint for inserting data into the measurements table
 @app.post("/measurements")
