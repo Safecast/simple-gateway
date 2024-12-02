@@ -160,6 +160,9 @@ async def add_measurement(request: Request, api_key: str = Query(...)):
         data['loc_lon'] = data.get('longitude')  # Mapping longitude to loc_lon
         data['received_at'] = datetime.now().isoformat()
 
+        # Check if the 'height' field is provided, and map it to 'altitude'
+        data['altitude'] = data.get('height')  # Mapping height to altitude (new column)
+
         # If 'device' is missing, set a default value or handle the case
         if 'device' not in data:
             data['device'] = 0  # Default value or handle as needed
@@ -181,10 +184,17 @@ async def add_measurement(request: Request, api_key: str = Query(...)):
             "pms_pm02_5": parse_value(data.get("pms_pm02_5"), float),
             "when_captured": data["when_captured"],
             "received_at": data["received_at"],
+            "altitude": data.get("altitude"),  # Include altitude in cleaned_data
         }
 
         with duckdb.connect(DB_PATH) as conn:
             existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(measurements)").fetchall()}
+
+            # Add the 'altitude' column if it doesn't exist
+            if 'altitude' not in existing_columns:
+                conn.execute("ALTER TABLE measurements ADD COLUMN altitude DOUBLE")
+
+            # Add other columns if they don't exist (same as before)
             for field, value in cleaned_data.items():
                 if field not in existing_columns:
                     column_type = "DOUBLE" if isinstance(value, (int, float)) else "VARCHAR"
@@ -194,6 +204,7 @@ async def add_measurement(request: Request, api_key: str = Query(...)):
             placeholders = ", ".join(["?" for _ in cleaned_data])
             values = [cleaned_data.get(col) for col in cleaned_data]
 
+            # Insert data into the measurements table
             conn.execute(f"INSERT INTO measurements ({columns}) VALUES ({placeholders})", values)
 
         logging.debug("Data inserted successfully")
