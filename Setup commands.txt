@@ -11,7 +11,7 @@ In Grafana;
 
 
 Test a curl:
-   curl -X POST http://localhost:8000/measurements?api_key=q1LKu7RQyxunnDW -H "Content-Type: application/json" -d '{"longitude":"139.7449","latitude":"35.6617","device_id":"49","value":"60","unit":"cpm","height":"111"}'
+   curl -X POST http://grafana.safecast.jp:8000/measurements?api_key=q1LKu7RQyxunnDW -H "Content-Type: application/json" -d '{"when_captured": "2024-11-02T15:38:00","longitude":"139.7449","latitude":"35.6617","device_urn":"49","device":"49","value":"60","unit":"cpm","height":"111"}'
 
 curl -X POST "http://grafana.safecast.jp:8000/measurements?api_key=q1LKu7RQyxunnDW" \
     -H "Content-Type: application/json" \
@@ -31,11 +31,16 @@ curl -X POST "http://grafana.safecast.jp:8000/measurements?api_key=q1LKu7RQyxunn
         "loc_name": "San Francisco",
         "pms_pm02_5": "12.5",
         "device_class": "geigiecast-zen",
-        "when_captured": "2024-11-02T15:37:00"
+        "when_captured": "2024-11-02T15:38:00"
     }'
 
 
-
+Minimum:
+curl -X POST "http://grafana.safecast.jp:8000/measurements?api_key=q1LKu7RQyxunnDW" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "device": "2830364905"
+    }'
 
     
     curl -X GET "http://localhost:8000/query?device_sn=SN12345" 

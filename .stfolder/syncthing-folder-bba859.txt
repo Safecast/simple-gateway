@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: tzkwv-hvsm5
+created: 2024-11-27T23:18:15+09:00
