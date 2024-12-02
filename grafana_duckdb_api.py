@@ -55,7 +55,6 @@ async def get_distinct_values(column: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Enhanced /query endpoint
-
 @app.get("/query")
 async def run_query(
     device: Optional[int] = None,
@@ -143,9 +142,6 @@ async def run_query(
         logging.error(f"Error executing query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
-
 # Endpoint for inserting data into the measurements table
 @app.post("/measurements")
 async def add_measurement(request: Request, api_key: str = Query(...)):
@@ -155,8 +151,18 @@ async def add_measurement(request: Request, api_key: str = Query(...)):
 
     try:
         data = await request.json()
-        data['when_captured'] = data.get('when_captured', datetime.now().isoformat())
+
+        # Ensure required fields are present, and map new fields to existing columns
+        data['when_captured'] = data.get('captured_at', datetime.now().isoformat())
+        data['device_sn'] = data.get('device_id')  # Mapping device_id to device_sn
+        data['CMP'] = data.get('value')  # Mapping value to CMP
+        data['loc_lat'] = data.get('latitude')  # Mapping latitude to loc_lat
+        data['loc_lon'] = data.get('longitude')  # Mapping longitude to loc_lon
         data['received_at'] = datetime.now().isoformat()
+
+        # If 'device' is missing, set a default value or handle the case
+        if 'device' not in data:
+            data['device'] = 0  # Default value or handle as needed
 
         cleaned_data = {
             "bat_voltage": parse_value(data.get("bat_voltage"), float),
@@ -189,14 +195,10 @@ async def add_measurement(request: Request, api_key: str = Query(...)):
             values = [cleaned_data.get(col) for col in cleaned_data]
 
             conn.execute(f"INSERT INTO measurements ({columns}) VALUES ({placeholders})", values)
+
         logging.debug("Data inserted successfully")
         return {"status": "success"}
 
     except Exception as e:
         logging.error(f"Error adding measurement: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Endpoint to check API status
-@app.get("/status")
-async def status():
-    return {"status": "API is running"}
+        raise HTTPException(status_code=500, detail=f"Error adding measurement: {str(e)}")

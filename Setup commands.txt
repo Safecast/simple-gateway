@@ -75,3 +75,16 @@ curl -X POST "http://grafana.safecast.jp:8000/measurements?api_key=q1LKu7RQyxunn
         "device_class": "geigiecast-zen",
         "when_captured": "2024-11-02T15:30:00"
     }'
+
+
+Locally testing
+
+    curl -X POST "http://localhost:8000/measurements?api_key=q1LKu7RQyxunnDW" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "device_id": "65001",
+        "value": "20",
+        "latitude": "37.7749",
+        "longitude": "-122.4194",
+        "captured_at": "2024-11-02T15:47:00"
+    }'
