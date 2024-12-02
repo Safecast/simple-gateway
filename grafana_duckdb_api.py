@@ -6,6 +6,8 @@ from typing import Optional, List
 
 app = FastAPI()
 DB_PATH = "devices.duckdb"
+# from server needs to be DB_PATH = "/home/grafana.safecast.jp/public_html/devices.duckdb"
+
 logging.basicConfig(level=logging.DEBUG)
 API_KEY = "q1LKu7RQyxunnDW"
 

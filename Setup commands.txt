@@ -73,7 +73,7 @@ curl -X POST "http://grafana.safecast.jp:8000/measurements?api_key=q1LKu7RQyxunn
         "loc_name": "San Francisco",
         "pms_pm02_5": "12.5",
         "device_class": "geigiecast-zen",
-        "when_captured": "2024-11-02T15:30:00"
+        "when_captured": "2024-11-02T15:56:00"
     }'
 
 
